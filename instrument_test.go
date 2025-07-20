@@ -424,17 +424,17 @@ func TestOrderBook(t *testing.T) {
 			BucketWidth: "0.0001",
 			Buckets: []Bucket{
 				{
-					Price:      "1.0999",
+					Price:             "1.0999",
 					LongCountPercent:  "40",
 					ShortCountPercent: "60",
 				},
 				{
-					Price:      "1.1000",
+					Price:             "1.1000",
 					LongCountPercent:  "50",
 					ShortCountPercent: "50",
 				},
 				{
-					Price:      "1.1001",
+					Price:             "1.1001",
 					LongCountPercent:  "60",
 					ShortCountPercent: "40",
 				},
@@ -480,5 +480,136 @@ func TestOrderBook(t *testing.T) {
 
 	if book.Buckets[0].ShortCountPercent != "60" {
 		t.Errorf("Expected first bucket ShortCountPercent to be 60, got %s", book.Buckets[0].ShortCountPercent)
+	}
+}
+
+func TestGetTimeRangeCandles(t *testing.T) {
+	defer logTestResult(t, "GetTimeRangeCandles")
+
+	// Define specific test times for consistent testing
+	fromTime := time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC)
+	toTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	expectedFromUnix := "1704103200" // fromTime.Unix() as string
+	expectedToUnix := "1704110400"   // toTime.Unix() as string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/instruments/EUR_USD/candles" {
+			t.Errorf("Unexpected path: %s", r.URL.Path)
+			http.Error(w, "Invalid path", http.StatusBadRequest)
+			return
+		}
+
+		// Check that count parameter is NOT present (should be omitted when using from+to)
+		count := r.URL.Query().Get("count")
+		if count != "" {
+			t.Errorf("Expected no count parameter when using from+to, but got count=%s", count)
+		}
+
+		// Check from parameter
+		from := r.URL.Query().Get("from")
+		if from != expectedFromUnix {
+			t.Errorf("Expected from to be %s, got %s", expectedFromUnix, from)
+		}
+
+		// Check to parameter
+		to := r.URL.Query().Get("to")
+		if to != expectedToUnix {
+			t.Errorf("Expected to to be %s, got %s", expectedToUnix, to)
+		}
+
+		// Check granularity
+		granularity := r.URL.Query().Get("granularity")
+		if granularity != "H1" {
+			t.Errorf("Expected granularity to be H1, got %s", granularity)
+		}
+
+		response := InstrumentHistory{
+			Instrument:  "EUR_USD",
+			Granularity: "H1",
+			Candles: []Candles{
+				{
+					Complete: true,
+					Volume:   150,
+					Time:     fromTime,
+					Mid: Candle{
+						Open:  1.1000,
+						High:  1.1020,
+						Low:   1.0980,
+						Close: 1.1010,
+					},
+				},
+				{
+					Complete: true,
+					Volume:   200,
+					Time:     fromTime.Add(time.Hour),
+					Mid: Candle{
+						Open:  1.1010,
+						High:  1.1030,
+						Low:   1.0990,
+						Close: 1.1015,
+					},
+				},
+			},
+		}
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	c := &Connection{
+		hostname: server.URL,
+		client:   *server.Client(),
+	}
+
+	history, err := c.GetTimeRangeCandles("EUR_USD", GranularityHour, fromTime, toTime)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if history.Instrument != "EUR_USD" {
+		t.Errorf("Expected Instrument to be EUR_USD, got %s", history.Instrument)
+	}
+
+	if history.Granularity != "H1" {
+		t.Errorf("Expected Granularity to be H1, got %s", history.Granularity)
+	}
+
+	if len(history.Candles) != 2 {
+		t.Fatalf("Expected 2 candles, got %d", len(history.Candles))
+	}
+
+	// Test first candle
+	firstCandle := history.Candles[0]
+	if !firstCandle.Complete {
+		t.Errorf("Expected first candle Complete to be true")
+	}
+
+	if firstCandle.Volume != 150 {
+		t.Errorf("Expected first candle Volume to be 150, got %d", firstCandle.Volume)
+	}
+
+	if firstCandle.Mid.Open != 1.1000 {
+		t.Errorf("Expected first candle Open to be 1.1000, got %f", firstCandle.Mid.Open)
+	}
+
+	if firstCandle.Mid.Close != 1.1010 {
+		t.Errorf("Expected first candle Close to be 1.1010, got %f", firstCandle.Mid.Close)
+	}
+
+	// Test second candle
+	secondCandle := history.Candles[1]
+	if !secondCandle.Complete {
+		t.Errorf("Expected second candle Complete to be true")
+	}
+
+	if secondCandle.Volume != 200 {
+		t.Errorf("Expected second candle Volume to be 200, got %d", secondCandle.Volume)
+	}
+
+	if secondCandle.Mid.Open != 1.1010 {
+		t.Errorf("Expected second candle Open to be 1.1010, got %f", secondCandle.Mid.Open)
+	}
+
+	if secondCandle.Mid.Close != 1.1015 {
+		t.Errorf("Expected second candle Close to be 1.1015, got %f", secondCandle.Mid.Close)
 	}
 }

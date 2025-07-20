@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"time"
+
 	"github.com/awoldes/goanda"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/joho/godotenv"
@@ -17,8 +18,8 @@ func candles() {
 
 	config := &goanda.ConnectionConfig{
 		UserAgent: "goanda",
-		Timeout: 10 * time.Second,
-		Live: false,
+		Timeout:   10 * time.Second,
+		Live:      false,
 	}
 
 	granularity := goanda.GranularityFiveSeconds
@@ -31,10 +32,20 @@ func candles() {
 		log.Fatalf("Error creating connection: %v", err)
 	}
 
+	// Example 1: Get latest 10 candles
 	history, err := oanda.GetCandles("EUR_USD", 10, granularity)
 	if err != nil {
 		log.Fatalf("Error getting candles: %v", err)
 	}
+	spew.Dump("Latest 10 candles:", history)
 
-	spew.Dump(history)
+	// Example 2: Get candles between specific time range
+	from := time.Now().Add(-24 * time.Hour) // 24 hours ago
+	to := time.Now().Add(-12 * time.Hour)   // 12 hours ago
+
+	rangeHistory, err := oanda.GetTimeRangeCandles("EUR_USD", goanda.GranularityHour, from, to)
+	if err != nil {
+		log.Fatalf("Error getting time range candles: %v", err)
+	}
+	spew.Dump("Time range candles (24h-12h ago):", rangeHistory)
 }

@@ -175,6 +175,8 @@ type InstrumentPricing struct {
 	} `json:"prices"`
 }
 
+// GetCandles fetches the most recent candle data for an instrument.
+// Returns the specified count of candles with the given granularity.
 func (c *Connection) GetCandles(instrument string, count int, g Granularity) (InstrumentHistory, error) {
 	ca := InstrumentHistory{}
 	err := c.getAndUnmarshal(
@@ -189,6 +191,8 @@ func (c *Connection) GetCandles(instrument string, count int, g Granularity) (In
 	return ca, err
 }
 
+// GetTimeToCandles fetches candle data for an instrument up to a specific end time.
+// Returns the specified count of candles ending at the given time.
 func (c *Connection) GetTimeToCandles(instrument string, count int, g Granularity, to time.Time) (InstrumentHistory, error) {
 	ih := InstrumentHistory{}
 	err := c.getAndUnmarshal(
@@ -204,6 +208,9 @@ func (c *Connection) GetTimeToCandles(instrument string, count int, g Granularit
 	)
 	return ih, err
 }
+
+// GetTimeFromCandles fetches candle data for an instrument starting from a specific time.
+// Returns the specified count of candles beginning from the given time.
 func (c *Connection) GetTimeFromCandles(instrument string, count int, g Granularity, from time.Time) (InstrumentHistory, error) {
 	ih := InstrumentHistory{}
 	err := c.getAndUnmarshal(
@@ -220,6 +227,27 @@ func (c *Connection) GetTimeFromCandles(instrument string, count int, g Granular
 	return ih, err
 }
 
+// GetTimeRangeCandles fetches candle data for an instrument between specific start and end times.
+// The number of candles returned is determined by the time range and granularity.
+// Note: count parameter is not used when both from and to times are specified.
+func (c *Connection) GetTimeRangeCandles(instrument string, g Granularity, from time.Time, to time.Time) (InstrumentHistory, error) {
+	ih := InstrumentHistory{}
+	err := c.getAndUnmarshal(
+		"/instruments/"+
+			instrument+
+			"/candles?from="+
+			strconv.Itoa(int(from.Unix()))+
+			"&to="+
+			strconv.Itoa(int(to.Unix()))+
+			"&granularity="+
+			g.String(),
+		&ih,
+	)
+	return ih, err
+}
+
+// GetBidAskCandles fetches bid and ask candle data for an instrument.
+// Returns separate bid and ask price information for each candle.
 func (c *Connection) GetBidAskCandles(instrument string, count string, g Granularity) (BidAskCandles, error) {
 	ca := BidAskCandles{}
 	err := c.getAndUnmarshal(
