@@ -229,7 +229,6 @@ func (c *Connection) GetTimeFromCandles(instrument string, count int, g Granular
 
 // GetTimeRangeCandles fetches candle data for an instrument between specific start and end times.
 // The number of candles returned is determined by the time range and granularity.
-// Note: count parameter is not used when both from and to times are specified.
 func (c *Connection) GetTimeRangeCandles(instrument string, g Granularity, from time.Time, to time.Time) (InstrumentHistory, error) {
 	ih := InstrumentHistory{}
 	err := c.getAndUnmarshal(
